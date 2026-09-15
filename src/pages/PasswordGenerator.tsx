@@ -1,23 +1,50 @@
 import { useState } from 'react';
-import { Key, Shuffle, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Key, Copy, Check, AlertTriangle, Shield, Lock } from 'lucide-react';
 
-// Cryptographically secure random integer in range [0, max) using rejection sampling
-// This eliminates modulo bias
+/**
+ * Cryptographically secure random integer in range [0, max) using rejection sampling.
+ * 
+ * This implementation:
+ * - Uses Web Crypto API (crypto.getRandomValues) for true cryptographic randomness
+ * - Implements rejection sampling to eliminate modulo bias
+ * - Ensures uniform distribution across all possible values
+ * - Is unpredictable and cannot be reconstructed
+ * 
+ * Why rejection sampling?
+ * - Simple modulo (value % max) introduces bias when max doesn't evenly divide 2^32
+ * - Rejection sampling rejects values that would cause bias, ensuring perfect uniformity
+ * - Performance impact is negligible (average < 1 rejection per call)
+ */
 function secureRandomInt(max: number): number {
   if (max <= 0) throw new Error('max must be positive');
   if (max === 1) return 0;
   
   const array = new Uint32Array(1);
+  // Calculate the largest multiple of max that fits in 2^32
+  // This is our "unbiased range" - any value below this is equally likely
   const limit = Math.floor(0xFFFFFFFF / max) * max;
   
   // Rejection sampling: keep generating until we get a value in our unbiased range
   let value: number;
+  let attempts = 0;
   do {
     crypto.getRandomValues(array);
     value = array[0];
+    attempts++;
+    // Safety check to prevent infinite loops (should never happen in practice)
+    if (attempts > 1000) {
+      throw new Error('Random number generation failed');
+    }
   } while (value >= limit);
   
   return value % max;
+}
+
+/**
+ * Verify that Web Crypto API is available
+ */
+function isWebCryptoAvailable(): boolean {
+  return typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function';
 }
 
 // Expanded word list - 1024 common English words for better entropy
@@ -240,8 +267,15 @@ export default function PasswordGeneratorPage() {
   const [password, setPassword] = useState('');
   const [copied, setCopied] = useState(false);
   const [entropy, setEntropy] = useState(0);
+  const [cryptoAvailable] = useState(isWebCryptoAvailable());
+  const [generationCount, setGenerationCount] = useState(0);
 
   const generate = () => {
+    if (!cryptoAvailable) {
+      setPassword('Error: Web Crypto API not available');
+      return;
+    }
+
     if (passphrase) {
       const selected: string[] = [];
       for (let i = 0; i < wordCount; i++) {
@@ -254,6 +288,7 @@ export default function PasswordGeneratorPage() {
       // Calculate entropy: log2(words^wordCount)
       const e = wordCount * Math.log2(WORDS.length);
       setEntropy(e);
+      setGenerationCount(prev => prev + 1);
       return;
     }
     
@@ -279,6 +314,7 @@ export default function PasswordGeneratorPage() {
     // Calculate entropy: log2(chars^length)
     const e = length * Math.log2(chars.length);
     setEntropy(e);
+    setGenerationCount(prev => prev + 1);
   };
 
   const copy = () => {
@@ -299,10 +335,51 @@ export default function PasswordGeneratorPage() {
 
   return (
     <div className="max-w-lg mx-auto pb-20 lg:pb-0">
-      <h1 className="text-2xl font-bold mb-2">Password Generator</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <h1 className="text-2xl font-bold">Password Generator</h1>
+        {cryptoAvailable && (
+          <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-xs font-medium">
+            <Shield size={12} />
+            <span>Secure</span>
+          </div>
+        )}
+      </div>
       <p className="text-gray-500 dark:text-gray-400 mb-6">
-        Generate cryptographically secure passwords locally in your browser using rejection sampling to eliminate modulo bias.
+        Generate cryptographically secure passwords using the Web Crypto API with rejection sampling.
       </p>
+
+      {/* Cryptographic Security Verification */}
+      <div className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
+        <div className="flex items-start gap-3">
+          <Lock size={20} className="text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-indigo-900 dark:text-indigo-100 mb-2">
+              Cryptographic Security
+            </h3>
+            <div className="space-y-1.5 text-xs text-indigo-800 dark:text-indigo-200">
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${cryptoAvailable ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span>Web Crypto API: {cryptoAvailable ? 'Available ✓' : 'Not Available ✗'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                <span>Rejection Sampling: Active (eliminates modulo bias)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                <span>Entropy Source: crypto.getRandomValues() (CSPRNG)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                <span>Passwords Generated: {generationCount}</span>
+              </div>
+            </div>
+            <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-2 italic">
+              Each password is unpredictable and cannot be reconstructed. The cryptographic randomness ensures no pattern or seed can be discovered.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         {password && (
@@ -379,18 +456,41 @@ export default function PasswordGeneratorPage() {
           <Key size={18} /> Generate Password
         </button>
 
-        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <div className="flex items-start gap-2">
             <AlertTriangle size={16} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
             <div className="text-xs text-blue-800 dark:text-blue-300">
-              <p className="font-medium mb-1">Security Notes:</p>
-              <ul className="list-disc list-inside space-y-0.5">
-                <li>Uses Web Crypto API (cryptographically secure)</li>
-                <li>Rejection sampling eliminates modulo bias</li>
-                <li>Passwords never stored or transmitted</li>
-                <li>For passphrases: 4+ words recommended (80+ bits)</li>
-                <li>For passwords: 16+ characters recommended</li>
+              <p className="font-semibold mb-2">Why This Is Truly Secure:</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                  <span><strong>Cryptographic Randomness:</strong> Uses browser's Web Crypto API (crypto.getRandomValues), which is a Cryptographically Secure Pseudo-Random Number Generator (CSPRNG) backed by OS-level entropy sources</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                  <span><strong>No Math.random():</strong> Unlike Math.random(), which is predictable and not secure, crypto.getRandomValues() generates unpredictable values</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                  <span><strong>Rejection Sampling:</strong> Eliminates modulo bias by rejecting values that would create uneven distribution, ensuring perfect uniformity</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                  <span><strong>Unpredictable:</strong> Each generated password cannot be predicted, reconstructed, or reverse-engineered from previous outputs</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">•</span>
+                  <span><strong>Local Only:</strong> Passwords are generated entirely in your browser and never transmitted or stored</span>
+                </li>
               </ul>
+              <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                <p className="font-semibold mb-1">Recommendations:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>For passphrases: 4+ words recommended (40+ bits entropy)</li>
+                  <li>For passwords: 16+ characters with all character types (80+ bits entropy)</li>
+                  <li>Use a password manager to store generated passwords securely</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
