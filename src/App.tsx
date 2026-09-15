@@ -25,7 +25,7 @@ const PresentationPlannerPage = lazy(() => import('./pages/PresentationPlanner')
 const QuizBuilderPage = lazy(() => import('./pages/QuizBuilder'));
 const ReferencesPage = lazy(() => import('./pages/Utilities').then(m => ({ default: m.ReferencesPage })));
 const SettingsPage = lazy(() => import('./pages/Utilities').then(m => ({ default: m.SettingsPage })));
-const PasswordGeneratorPage = lazy(() => import('./pages/RandomTools').then(m => ({ default: m.PasswordGeneratorPage })));
+const PasswordGeneratorPage = lazy(() => import('./pages/PasswordGenerator'));
 const RandomToolsPage = lazy(() => import('./pages/RandomTools').then(m => ({ default: m.RandomToolsPage })));
 const ColorToolsPage = lazy(() => import('./pages/ColorTools').then(m => ({ default: m.ColorToolsPage })));
 const QRCodePage = lazy(() => import('./pages/Utilities').then(m => ({ default: m.QRCodePage })));

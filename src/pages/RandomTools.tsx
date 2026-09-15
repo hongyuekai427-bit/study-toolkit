@@ -1,98 +1,5 @@
 import { useState } from 'react';
-import { Key, Shuffle, Copy, Check, Dices } from 'lucide-react';
-
-export function PasswordGeneratorPage() {
-  const [length, setLength] = useState(16);
-  const [uppercase, setUppercase] = useState(true);
-  const [lowercase, setLowercase] = useState(true);
-  const [numbers, setNumbers] = useState(true);
-  const [symbols, setSymbols] = useState(true);
-  const [passphrase, setPassphrase] = useState(false);
-  const [wordCount, setWordCount] = useState(4);
-  const [password, setPassword] = useState('');
-  const [copied, setCopied] = useState(false);
-
-  const words = ['apple', 'brave', 'cloud', 'dance', 'eagle', 'flame', 'grape', 'house', 'ivory', 'joker', 'kneel', 'light', 'maple', 'noble', 'ocean', 'pearl', 'quiet', 'river', 'stone', 'tiger', 'unity', 'vivid', 'water', 'xenon', 'yacht', 'zebra', 'amber', 'birch', 'coral', 'delta', 'ember', 'frost', 'glide', 'haven', 'index', 'jewel', 'karma', 'lunar', 'mocha', 'north', 'orbit', 'prism', 'quest', 'ridge', 'solar', 'thorn', 'ultra', 'vault', 'whirl', 'pixel'];
-
-  const generate = () => {
-    if (passphrase) {
-      const selected: string[] = [];
-      const array = new Uint32Array(wordCount);
-      crypto.getRandomValues(array);
-      for (let i = 0; i < wordCount; i++) {
-        selected.push(words[array[i] % words.length]);
-      }
-      setPassword(selected.join('-'));
-      return;
-    }
-    let chars = '';
-    if (uppercase) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    if (lowercase) chars += 'abcdefghijklmnopqrstuvwxyz';
-    if (numbers) chars += '0123456789';
-    if (symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    if (!chars) { setPassword('Select at least one option'); return; }
-    const array = new Uint32Array(length);
-    crypto.getRandomValues(array);
-    let result = '';
-    for (let i = 0; i < length; i++) result += chars[array[i] % chars.length];
-    setPassword(result);
-  };
-
-  const copy = () => {
-    navigator.clipboard.writeText(password);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="max-w-lg mx-auto pb-20 lg:pb-0">
-      <h1 className="text-2xl font-bold mb-2">Password Generator</h1>
-      <p className="text-gray-500 dark:text-gray-400 mb-6">Generate secure passwords locally in your browser. Passwords are never stored or sent anywhere.</p>
-
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        {password && (
-          <div className="flex items-center gap-2 mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <code className="flex-1 text-sm font-mono break-all">{password}</code>
-            <button onClick={copy} className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-600 shrink-0">
-              {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} className="text-gray-500" />}
-            </button>
-          </div>
-        )}
-
-        <div className="space-y-4">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" checked={passphrase} onChange={e => setPassphrase(e.target.checked)} className="rounded" />
-            <span className="text-sm">Generate passphrase instead</span>
-          </label>
-
-          {!passphrase ? (
-            <>
-              <div>
-                <label className="text-sm text-gray-500 block mb-1">Length: {length}</label>
-                <input type="range" min="4" max="64" value={length} onChange={e => setLength(parseInt(e.target.value))} className="w-full" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={uppercase} onChange={e => setUppercase(e.target.checked)} className="rounded" /> Uppercase</label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={lowercase} onChange={e => setLowercase(e.target.checked)} className="rounded" /> Lowercase</label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={numbers} onChange={e => setNumbers(e.target.checked)} className="rounded" /> Numbers</label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={symbols} onChange={e => setSymbols(e.target.checked)} className="rounded" /> Symbols</label>
-              </div>
-            </>
-          ) : (
-            <div>
-              <label className="text-sm text-gray-500 block mb-1">Word count: {wordCount}</label>
-              <input type="range" min="3" max="8" value={wordCount} onChange={e => setWordCount(parseInt(e.target.value))} className="w-full" />
-            </div>
-          )}
-        </div>
-
-        <button onClick={generate} className="w-full mt-4 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center justify-center gap-2">
-          <Key size={18} /> Generate
-        </button>
-      </div>
-    </div>
-  );
-}
+import { Shuffle } from 'lucide-react';
 
 export function RandomToolsPage() {
   const [mode, setMode] = useState<'number' | 'choice' | 'dice' | 'coin' | 'team'>('number');
@@ -103,39 +10,60 @@ export function RandomToolsPage() {
   const [teamCount, setTeamCount] = useState('2');
   const [members, setMembers] = useState('');
 
-  const generate = () => {
+  // Secure random integer in range [0, max) using rejection sampling
+  const secureRandInt = (max: number): number => {
+    if (max <= 1) return 0;
     const array = new Uint32Array(1);
-    crypto.getRandomValues(array);
-    const rand = array[0] / (0xFFFFFFFF + 1);
+    const limit = Math.floor(0xFFFFFFFF / max) * max;
+    let value: number;
+    do {
+      crypto.getRandomValues(array);
+      value = array[0];
+    } while (value >= limit);
+    return value % max;
+  };
 
+  // Fisher-Yates shuffle using secure random
+  const secureShuffle = <T,>(array: T[]): T[] => {
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = secureRandInt(i + 1);
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  };
+
+  const generate = () => {
     switch (mode) {
       case 'number': {
         const lo = parseInt(min) || 0;
         const hi = parseInt(max) || 100;
-        setResult(`${Math.floor(rand * (hi - lo + 1)) + lo}`);
+        if (lo > hi) { setResult('Min must be ≤ Max'); return; }
+        const range = hi - lo + 1;
+        setResult(`${secureRandInt(range) + lo}`);
         break;
       }
       case 'choice': {
         const opts = choices.split('\n').filter(c => c.trim());
         if (opts.length === 0) { setResult('Add some choices'); return; }
-        setResult(opts[Math.floor(rand * opts.length)]);
+        setResult(opts[secureRandInt(opts.length)]);
         break;
       }
       case 'dice': {
-        const dice = Math.floor(rand * 6) + 1;
+        const dice = secureRandInt(6) + 1;
         const emojis = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
         setResult(`${emojis[dice]} ${dice}`);
         break;
       }
       case 'coin': {
-        setResult(rand < 0.5 ? '🪙 Heads' : '🪙 Tails');
+        setResult(secureRandInt(2) === 0 ? '🪙 Heads' : '🪙 Tails');
         break;
       }
       case 'team': {
         const mems = members.split('\n').filter(m => m.trim());
         const tc = parseInt(teamCount) || 2;
         if (mems.length === 0) { setResult('Add members'); return; }
-        const shuffled = [...mems].sort(() => rand - 0.5);
+        const shuffled = secureShuffle(mems);
         const teams: string[][] = Array.from({ length: tc }, () => []);
         shuffled.forEach((m, i) => teams[i % tc].push(m));
         setResult(teams.map((t, i) => `Team ${i + 1}: ${t.join(', ')}`).join('\n'));
