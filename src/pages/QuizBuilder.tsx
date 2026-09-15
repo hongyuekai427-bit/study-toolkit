@@ -41,11 +41,27 @@ export default function QuizBuilderPage() {
 
   const addQuestion = async () => {
     if (!activeQuiz || !newQuestion.question?.trim()) return;
+    
+    // Validate correct answer is set
+    if (!newQuestion.correctAnswer?.trim()) {
+      alert('Please select or enter the correct answer');
+      return;
+    }
+    
+    // For multiple choice, ensure at least 2 options are filled
+    if (newQuestion.type === 'multiple-choice') {
+      const filledOptions = (newQuestion.options || []).filter(o => o.trim());
+      if (filledOptions.length < 2) {
+        alert('Please fill in at least 2 options');
+        return;
+      }
+    }
+    
     const q: QuizQuestion = {
       id: uuid(), type: newQuestion.type as QuizQuestion['type'],
       question: newQuestion.question.trim(),
       options: newQuestion.type === 'short-answer' ? [] : (newQuestion.options || []).filter(o => o.trim()),
-      correctAnswer: newQuestion.correctAnswer?.trim() || '',
+      correctAnswer: newQuestion.correctAnswer.trim(),
       points: newQuestion.points || 1,
     };
     const updated = { ...activeQuiz, questions: [...activeQuiz.questions, q] };
@@ -110,27 +126,59 @@ export default function QuizBuilderPage() {
           <p className="text-lg font-medium mb-4">{q.question}</p>
           {q.type === 'multiple-choice' ? (
             <div className="space-y-2 mb-4">
-              {q.options.map((opt, i) => (
-                <button key={i} onClick={() => !showResult && setAnswer(opt)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${answer === opt ? (showResult ? (opt.toLowerCase() === q.correctAnswer.toLowerCase() ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20') : 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20') : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'}`}>
-                  {opt}
-                </button>
-              ))}
+              {q.options.map((opt, i) => {
+                const isSelected = answer === opt;
+                const isCorrect = opt.toLowerCase() === q.correctAnswer.toLowerCase();
+                let btnClass = 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500';
+                if (showResult) {
+                  if (isCorrect) btnClass = 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                  else if (isSelected && !isCorrect) btnClass = 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300';
+                } else if (isSelected) {
+                  btnClass = 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300';
+                }
+                return (
+                  <button key={i} onClick={() => !showResult && setAnswer(opt)}
+                    className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${btnClass}`}>
+                    <span className="flex items-center gap-2">
+                      {showResult && isCorrect && <span className="text-green-500">✓</span>}
+                      {showResult && isSelected && !isCorrect && <span className="text-red-500">✗</span>}
+                      {!showResult && isSelected && <span className="text-indigo-500">●</span>}
+                      <span>{opt}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           ) : q.type === 'true-false' ? (
             <div className="flex gap-3 mb-4">
-              {['True', 'False'].map(opt => (
-                <button key={opt} onClick={() => !showResult && setAnswer(opt)}
-                  className={`flex-1 py-3 rounded-lg border font-medium ${answer === opt ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-200 dark:border-gray-600'}`}>{opt}</button>
-              ))}
+              {['True', 'False'].map(opt => {
+                const isSelected = answer === opt;
+                const isCorrect = opt === q.correctAnswer;
+                let btnClass = 'border-gray-200 dark:border-gray-600';
+                if (showResult) {
+                  if (isSelected && isCorrect) btnClass = 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                  else if (isSelected && !isCorrect) btnClass = 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300';
+                  else if (isCorrect) btnClass = 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                } else if (isSelected) {
+                  btnClass = 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300';
+                }
+                return (
+                  <button key={opt} onClick={() => !showResult && setAnswer(opt)}
+                    className={`flex-1 py-3 rounded-lg border font-medium transition-colors ${btnClass}`}>{opt}</button>
+                );
+              })}
             </div>
           ) : (
             <input type="text" value={answer} onChange={e => setAnswer(e.target.value)} disabled={showResult} placeholder="Your answer..." className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           )}
           {showResult && (
-            <p className={`text-sm font-medium mb-3 ${answer.toLowerCase() === q.correctAnswer.toLowerCase() ? 'text-green-600' : 'text-red-600'}`}>
-              {answer.toLowerCase() === q.correctAnswer.toLowerCase() ? '✓ Correct!' : `✗ Correct answer: ${q.correctAnswer}`}
-            </p>
+            <div className={`text-sm font-medium mb-3 p-2 rounded-lg ${answer.toLowerCase() === q.correctAnswer.toLowerCase() ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'}`}>
+              {answer.toLowerCase() === q.correctAnswer.toLowerCase() ? (
+                <span>✓ Correct!</span>
+              ) : (
+                <span>✗ Your answer: <strong>{answer || '(none)'}</strong> — Correct answer: <strong>{q.correctAnswer}</strong></span>
+              )}
+            </div>
           )}
           {!showResult ? (
             <button onClick={submitAnswer} disabled={!answer} className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50">Submit</button>
@@ -173,20 +221,97 @@ export default function QuizBuilderPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
           <h3 className="text-sm font-semibold mb-3">Add Question</h3>
           <div className="space-y-3">
-            <select value={newQuestion.type} onChange={e => setNewQuestion({ ...newQuestion, type: e.target.value as QuizQuestion['type'] })} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm">
+            <select value={newQuestion.type} onChange={e => {
+              const type = e.target.value as QuizQuestion['type'];
+              const updates: Partial<QuizQuestion> = { type, correctAnswer: '' };
+              if (type === 'multiple-choice') {
+                updates.options = ['', '', '', ''];
+              } else if (type === 'true-false') {
+                updates.options = ['True', 'False'];
+              } else {
+                updates.options = [];
+              }
+              setNewQuestion({ ...newQuestion, ...updates });
+            }} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm">
               <option value="multiple-choice">Multiple Choice</option>
               <option value="true-false">True/False</option>
               <option value="short-answer">Short Answer</option>
             </select>
             <textarea value={newQuestion.question} onChange={e => setNewQuestion({ ...newQuestion, question: e.target.value })} placeholder="Question text" rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            
+            {/* Multiple Choice: Options with radio buttons for correct answer */}
             {newQuestion.type === 'multiple-choice' && (
               <div className="space-y-2">
+                <p className="text-xs text-gray-500">Options (select the correct answer):</p>
                 {(newQuestion.options || ['', '', '', '']).map((opt, i) => (
-                  <input key={i} type="text" value={opt} onChange={e => { const opts = [...(newQuestion.options || ['', '', '', ''])]; opts[i] = e.target.value; setNewQuestion({ ...newQuestion, options: opts }); }} placeholder={`Option ${i + 1}`} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="correctAnswer"
+                      checked={newQuestion.correctAnswer === opt && opt.trim() !== ''}
+                      onChange={() => setNewQuestion({ ...newQuestion, correctAnswer: opt })}
+                      disabled={!opt.trim()}
+                      className="w-4 h-4 text-indigo-600"
+                    />
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={e => {
+                        const opts = [...(newQuestion.options || ['', '', '', ''])];
+                        const oldVal = opts[i];
+                        opts[i] = e.target.value;
+                        // Update correctAnswer if it was the old value
+                        const updates: Partial<QuizQuestion> = { options: opts };
+                        if (newQuestion.correctAnswer === oldVal) {
+                          updates.correctAnswer = e.target.value;
+                        }
+                        setNewQuestion({ ...newQuestion, ...updates });
+                      }}
+                      placeholder={`Option ${i + 1}`}
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
                 ))}
               </div>
             )}
-            <input type="text" value={newQuestion.correctAnswer} onChange={e => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })} placeholder="Correct answer" className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+
+            {/* True/False: Toggle buttons for correct answer */}
+            {newQuestion.type === 'true-false' && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500">Select the correct answer:</p>
+                <div className="flex gap-2">
+                  {['True', 'False'].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setNewQuestion({ ...newQuestion, correctAnswer: val })}
+                      className={`flex-1 py-2 px-4 rounded-lg border font-medium text-sm transition-colors ${
+                        newQuestion.correctAnswer === val
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Short Answer: Text input for correct answer */}
+            {newQuestion.type === 'short-answer' && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Correct answer:</label>
+                <input
+                  type="text"
+                  value={newQuestion.correctAnswer}
+                  onChange={e => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })}
+                  placeholder="Type the correct answer"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            )}
+
             <button onClick={addQuestion} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">Add Question</button>
           </div>
         </div>
@@ -194,12 +319,34 @@ export default function QuizBuilderPage() {
         {/* Question List */}
         <div className="space-y-2">
           {activeQuiz.questions.map((q, i) => (
-            <div key={q.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium">{i + 1}. {q.question}</p>
-                <p className="text-xs text-gray-500 mt-1">Answer: {q.correctAnswer} • {q.points} pt</p>
+            <div key={q.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                      {q.type === 'multiple-choice' ? 'MCQ' : q.type === 'true-false' ? 'T/F' : 'SA'}
+                    </span>
+                    <p className="text-sm font-medium truncate">{i + 1}. {q.question}</p>
+                  </div>
+                  {q.type === 'multiple-choice' && (
+                    <div className="mt-1 space-y-0.5">
+                      {q.options.map((opt, j) => (
+                        <p key={j} className={`text-xs ${opt === q.correctAnswer ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-500'}`}>
+                          {opt === q.correctAnswer ? '✓' : '○'} {opt}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {q.type === 'true-false' && (
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1">✓ {q.correctAnswer}</p>
+                  )}
+                  {q.type === 'short-answer' && (
+                    <p className="text-xs text-gray-500 mt-1">Answer: <span className="text-green-600 dark:text-green-400 font-medium">{q.correctAnswer}</span></p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">{q.points} pt{q.points > 1 ? 's' : ''}</p>
+                </div>
+                <button onClick={async () => { const updated = { ...activeQuiz, questions: activeQuiz.questions.filter(qu => qu.id !== q.id) }; await dbPut('quizzes', updated); setActiveQuiz(updated); loadQuizzes(); }} className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0 ml-2"><Trash2 size={14} className="text-red-500" /></button>
               </div>
-              <button onClick={async () => { const updated = { ...activeQuiz, questions: activeQuiz.questions.filter(qu => qu.id !== q.id) }; await dbPut('quizzes', updated); setActiveQuiz(updated); loadQuizzes(); }} className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"><Trash2 size={14} className="text-red-500" /></button>
             </div>
           ))}
         </div>
