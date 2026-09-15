@@ -90,7 +90,7 @@ export default function App() {
   );
 }
 
-// Simple function grapher
+// Simple function grapher - evaluates expressions with x as variable
 function GraphPage() {
   const [functions, setFunctions] = useState([{ id: '1', expr: 'x^2', color: '#6366f1' }]);
   const [xMin, setXMin] = useState(-10);
@@ -114,6 +114,12 @@ function GraphPage() {
   const toScreenX = (x: number) => ((x - xMin) / xRange) * width;
   const toScreenY = (y: number) => height - ((y - yMin) / yRange) * height;
 
+  // Replace standalone 'x' with the numeric value, preserving function names
+  const substituteX = (expr: string, value: number): string => {
+    // Replace x that is not part of a word (not preceded or followed by a letter)
+    return expr.replace(/(?<![a-zA-Z])x(?![a-zA-Z])/gi, `(${value})`);
+  };
+
   const generatePath = (expr: string) => {
     if (!expr.trim()) return '';
     const points: string[] = [];
@@ -121,15 +127,19 @@ function GraphPage() {
     for (let i = 0; i <= steps; i++) {
       const x = xMin + (i / steps) * xRange;
       try {
-        const y = evaluate(expr.replace(/x/gi, `(${x})`), false);
-        if (isFinite(y) && y >= yMin - 5 && y <= yMax + 5) {
+        const substituted = substituteX(expr, x);
+        const y = evaluate(substituted, false);
+        if (isFinite(y) && y >= yMin - 50 && y <= yMax + 50) {
           const sx = toScreenX(x);
           const sy = toScreenY(y);
-          points.push(`${points.length === 0 ? 'M' : 'L'} ${sx} ${sy}`);
+          points.push(`${points.length === 0 ? 'M' : 'L'} ${sx.toFixed(2)} ${sy.toFixed(2)}`);
+        } else if (points.length > 0) {
+          // Break the path for discontinuities
+          points.push('');
         }
-      } catch { /* skip */ }
+      } catch { /* skip invalid points */ }
     }
-    return points.join(' ');
+    return points.filter(p => p !== '').join(' ');
   };
 
   return (
@@ -141,24 +151,24 @@ function GraphPage() {
         <div className="space-y-2 mb-4">
           {functions.map(f => (
             <div key={f.id} className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: f.color }} />
-              <span className="text-sm text-gray-500">y =</span>
-              <input type="text" value={f.expr} onChange={e => updateFunction(f.id, e.target.value)} placeholder="e.g. x^2, sin(x), 2x+3" className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              {functions.length > 1 && <button onClick={() => removeFunction(f.id)} className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">×</button>}
+              <div className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: f.color }} />
+              <span className="text-sm text-gray-500 shrink-0">y =</span>
+              <input type="text" value={f.expr} onChange={e => updateFunction(f.id, e.target.value)} placeholder="e.g. x^2, sin(x), 2*x+3" className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              {functions.length > 1 && <button onClick={() => removeFunction(f.id)} className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded shrink-0" aria-label="Remove function">×</button>}
             </div>
           ))}
         </div>
-        <button onClick={addFunction} className="text-sm text-indigo-600 hover:underline">+ Add function</button>
-        <div className="grid grid-cols-4 gap-2 mt-4">
-          <div><label className="text-xs text-gray-500">X min</label><input type="number" value={xMin} onChange={e => setXMin(parseFloat(e.target.value) || -10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm" /></div>
-          <div><label className="text-xs text-gray-500">X max</label><input type="number" value={xMax} onChange={e => setXMax(parseFloat(e.target.value) || 10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm" /></div>
-          <div><label className="text-xs text-gray-500">Y min</label><input type="number" value={yMin} onChange={e => setYMin(parseFloat(e.target.value) || -10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm" /></div>
-          <div><label className="text-xs text-gray-500">Y max</label><input type="number" value={yMax} onChange={e => setYMax(parseFloat(e.target.value) || 10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm" /></div>
+        <button onClick={addFunction} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">+ Add function</button>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+          <div><label className="text-xs text-gray-500 block mb-1">X min</label><input type="number" value={xMin} onChange={e => setXMin(parseFloat(e.target.value) || -10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" /></div>
+          <div><label className="text-xs text-gray-500 block mb-1">X max</label><input type="number" value={xMax} onChange={e => setXMax(parseFloat(e.target.value) || 10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" /></div>
+          <div><label className="text-xs text-gray-500 block mb-1">Y min</label><input type="number" value={yMin} onChange={e => setYMin(parseFloat(e.target.value) || -10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" /></div>
+          <div><label className="text-xs text-gray-500 block mb-1">Y max</label><input type="number" value={yMax} onChange={e => setYMax(parseFloat(e.target.value) || 10)} className="w-full px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" /></div>
         </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full max-w-xl mx-auto" style={{ minHeight: '300px' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full max-w-xl mx-auto" style={{ minHeight: '300px' }} role="img" aria-label="Function graph">
           {/* Grid */}
           {Array.from({ length: 11 }, (_, i) => {
             const x = xMin + (i / 10) * xRange;
@@ -171,13 +181,32 @@ function GraphPage() {
             );
           })}
           {/* Axes */}
-          {xMin <= 0 && xMax >= 0 && <line x1={toScreenX(0)} y1={0} x2={toScreenX(0)} y2={height} stroke="currentColor" strokeWidth="1" className="text-gray-400 dark:text-gray-500" />}
-          {yMin <= 0 && yMax >= 0 && <line x1={0} y1={toScreenY(0)} x2={width} y2={toScreenY(0)} stroke="currentColor" strokeWidth="1" className="text-gray-400 dark:text-gray-500" />}
+          {xMin <= 0 && xMax >= 0 && <line x1={toScreenX(0)} y1={0} x2={toScreenX(0)} y2={height} stroke="currentColor" strokeWidth="1.5" className="text-gray-400 dark:text-gray-500" />}
+          {yMin <= 0 && yMax >= 0 && <line x1={0} y1={toScreenY(0)} x2={width} y2={toScreenY(0)} stroke="currentColor" strokeWidth="1.5" className="text-gray-400 dark:text-gray-500" />}
+          {/* Axis labels */}
+          {xMin <= 0 && xMax >= 0 && <text x={toScreenX(0) + 4} y={12} className="text-gray-400 dark:text-gray-500" fontSize="10">y</text>}
+          {yMin <= 0 && yMax >= 0 && <text x={width - 12} y={toScreenY(0) - 4} className="text-gray-400 dark:text-gray-500" fontSize="10">x</text>}
           {/* Functions */}
-          {functions.map(f => (
-            <path key={f.id} d={generatePath(f.expr)} fill="none" stroke={f.color} strokeWidth="2" />
-          ))}
+          {functions.map(f => {
+            const pathData = generatePath(f.expr);
+            if (!pathData) return null;
+            // Split into segments for discontinuities
+            const segments = pathData.split(/\sM\s/);
+            return segments.map((seg, si) => (
+              <path key={`${f.id}-${si}`} d={si === 0 ? seg : `M ${seg}`} fill="none" stroke={f.color} strokeWidth="2" strokeLinecap="round" />
+            ));
+          })}
         </svg>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap gap-3">
+        {functions.filter(f => f.expr.trim()).map(f => (
+          <div key={f.id} className="flex items-center gap-2 text-sm">
+            <div className="w-4 h-0.5 rounded" style={{ backgroundColor: f.color }} />
+            <span className="font-mono text-xs">y = {f.expr}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

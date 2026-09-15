@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { Menu, X, Search, Sun, Moon, Monitor, Home, Calculator, Timer, CheckSquare, Layers, FileText, Calendar, ChevronRight } from 'lucide-react';
 import { TOOLS, searchTools } from '../data/tools';
 import { useTheme, useKeyboardShortcut } from '../hooks';
@@ -11,9 +11,10 @@ export default function Layout() {
   const [cmdIndex, setCmdIndex] = useState(0);
   const { theme, setTheme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const cmdInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setSidebarOpen(false); }, [location]);
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   useKeyboardShortcut('k', () => setCmdOpen(true), { ctrl: true });
 
@@ -27,10 +28,10 @@ export default function Layout() {
   useEffect(() => { setCmdIndex(0); }, [cmdQuery]);
 
   const navigateTo = useCallback((path: string) => {
-    window.location.hash = path;
+    navigate(path);
     setCmdOpen(false);
     setCmdQuery('');
-  }, []);
+  }, [navigate]);
 
   const handleCmdKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); setCmdIndex(i => Math.min(i + 1, allItems.length - 1)); }
@@ -97,6 +98,10 @@ export default function Layout() {
               {item.label}
             </Link>
           ))}
+          <Link to="/settings" className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${location.pathname === '/settings' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
+            <Monitor size={18} />
+            Settings
+          </Link>
         </nav>
 
         {/* Tools by Category */}
@@ -163,7 +168,7 @@ export default function Layout() {
                 onChange={e => setCmdQuery(e.target.value)}
                 onKeyDown={handleCmdKeyDown}
                 placeholder="Search tools..."
-                className="flex-1 bg-transparent outline-none text-lg placeholder:text-gray-400"
+                className="flex-1 bg-transparent outline-none text-lg placeholder:text-gray-400 text-gray-900 dark:text-gray-100"
               />
               <kbd className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-500">ESC</kbd>
             </div>

@@ -14,26 +14,30 @@ export default function Dashboard() {
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<Task[]>([]);
 
   useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const tasks = await dbGetAll<Task>('tasks');
+        const incompleteTasks = tasks.filter(t => !t.completed);
+        setTaskCount(incompleteTasks.length);
+        
+        const today = new Date().toISOString().split('T')[0];
+        const upcoming = incompleteTasks
+          .filter(t => t.dueDate && t.dueDate >= today)
+          .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+          .slice(0, 5);
+        setUpcomingDeadlines(upcoming);
+
+        const savedStats = localStorage.getItem('studyscope_stats');
+        if (savedStats) {
+          const parsed = JSON.parse(savedStats);
+          setStats(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to load stats:', e);
+      }
+    };
     loadStats();
   }, []);
-
-  const loadStats = async () => {
-    const tasks = await dbGetAll<Task>('tasks');
-    const incompleteTasks = tasks.filter(t => !t.completed);
-    setTaskCount(incompleteTasks.length);
-    
-    const today = new Date().toISOString().split('T')[0];
-    const upcoming = incompleteTasks
-      .filter(t => t.dueDate && t.dueDate >= today)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-      .slice(0, 5);
-    setUpcomingDeadlines(upcoming);
-
-    try {
-      const savedStats = localStorage.getItem('studyscope_stats');
-      if (savedStats) setStats(JSON.parse(savedStats));
-    } catch { /* ignore */ }
-  };
 
   const togglePin = (toolId: string) => {
     setPinnedTools(prev => prev.includes(toolId) ? prev.filter(id => id !== toolId) : [...prev, toolId]);
@@ -43,9 +47,11 @@ export default function Dashboard() {
   const pinned = pinnedTools.map(id => TOOLS.find(t => t.id === id)).filter(Boolean);
 
   const getDaysUntil = (dateStr: string) => {
+    if (!dateStr) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const target = new Date(dateStr);
+    if (isNaN(target.getTime())) return null;
     target.setHours(0, 0, 0, 0);
     return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
@@ -163,8 +169,8 @@ export default function Dashboard() {
                     <p className="text-sm font-medium truncate">{task.title}</p>
                     {task.subject && <p className="text-xs text-gray-500">{task.subject}</p>}
                   </div>
-                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${days === 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : days <= 2 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' : days <= 7 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'}`}>
-                    {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`}
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${days === null ? 'bg-gray-100 dark:bg-gray-700 text-gray-500' : days === 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : days <= 2 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' : days <= 7 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'}`}>
+                    {days === null ? 'No date' : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`}
                   </span>
                 </div>
               );

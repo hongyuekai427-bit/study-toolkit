@@ -40,13 +40,21 @@ export function ScienceToolsPage() {
   const currentFormula = getFormulas().find(f => f.id === selectedFormula) || getFormulas()[0];
 
   const calculate = () => {
-    const values = currentFormula.fields.map((_, i) => parseFloat(inputs[`field_${i}`]) || 0);
-    if (values.some(v => isNaN(v))) { setResult('Enter valid numbers'); return; }
+    const values = currentFormula.fields.map((_, i) => parseFloat(inputs[`field_${i}`]));
+    if (values.some(v => isNaN(v) || v === 0)) { setResult('Enter valid non-zero numbers'); return; }
     try {
       const res = (currentFormula.calc as (...args: number[]) => string | number)(...values);
-      setResult(`${typeof res === 'string' ? res : `${res.toFixed(4).replace(/\.?0+$/, '')} ${currentFormula.unit}`}`);
+      if (typeof res === 'string') {
+        setResult(res);
+      } else if (!isFinite(res)) {
+        setResult('Result is undefined or infinite');
+      } else {
+        setResult(`${parseFloat(res.toPrecision(10))} ${currentFormula.unit}`);
+      }
       setFormula(currentFormula.desc);
-    } catch { setResult('Error in calculation'); }
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : 'Calculation failed'}`);
+    }
   };
 
   return (
@@ -112,9 +120,18 @@ export function GeometryPage() {
   };
 
   const calculate = () => {
-    const values = shapes[shape].fields.map((_, i) => parseFloat(inputs[`f${i}`]) || 0);
-    if (values.some(v => isNaN(v) || v <= 0)) { setResults(['Enter valid positive numbers']); return; }
-    setResults(shapes[shape].calc(values));
+    const values = shapes[shape].fields.map((_, i) => parseFloat(inputs[`f${i}`]));
+    if (values.some(v => isNaN(v))) { setResults(['Enter valid numbers']); return; }
+    if (values.some(v => v <= 0)) { setResults(['All values must be positive']); return; }
+    try {
+      const results = shapes[shape].calc(values);
+      setResults(results.map(r => {
+        // Format numbers in results
+        return r.replace(/(\d+\.\d{4})\d+/g, (_, num) => parseFloat(num).toString());
+      }));
+    } catch (e) {
+      setResults([`Error: ${e instanceof Error ? e.message : 'Calculation failed'}`]);
+    }
   };
 
   return (

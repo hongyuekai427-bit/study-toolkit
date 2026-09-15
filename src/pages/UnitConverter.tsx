@@ -98,14 +98,22 @@ export default function UnitConverterPage() {
   const convert = () => {
     const num = parseFloat(value);
     if (isNaN(num)) { setResult('Enter a valid number'); return; }
+    if (!isFinite(num)) { setResult('Number is too large'); return; }
     const cat = units[category];
     const from = cat.units[fromUnit];
     const to = cat.units[toUnit];
-    if (!from || !to) { setResult('Invalid units'); return; }
-    const base = from.toBase(num);
-    const converted = to.fromBase(base);
-    const formatted = Math.abs(converted) < 0.0001 && converted !== 0 ? converted.toExponential(4) : parseFloat(converted.toPrecision(10)).toString();
-    setResult(`${num} ${fromUnit} = ${formatted} ${toUnit}`);
+    if (!from || !to) { setResult('Invalid units selected'); return; }
+    try {
+      const base = from.toBase(num);
+      const converted = to.fromBase(base);
+      if (!isFinite(converted)) { setResult('Result is undefined or infinite'); return; }
+      const formatted = Math.abs(converted) < 0.0001 && converted !== 0 
+        ? converted.toExponential(4) 
+        : parseFloat(converted.toPrecision(10)).toString();
+      setResult(`${num} ${fromUnit} = ${formatted} ${toUnit}`);
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : 'Conversion failed'}`);
+    }
   };
 
   const handleCategoryChange = (cat: Category) => {

@@ -23,7 +23,8 @@ export default function CalculatorPage() {
       setError('');
       setHistory(prev => [{ expression, result: formatted, timestamp: Date.now() }, ...prev].slice(0, 50));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Invalid expression');
+      const msg = e instanceof Error ? e.message : 'Invalid expression';
+      setError(msg);
       setResult('');
     }
   }, [expression, mode, setHistory]);

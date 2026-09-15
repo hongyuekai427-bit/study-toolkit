@@ -13,43 +13,54 @@ export default function PercentagePage() {
     const nb = parseFloat(b);
     if (isNaN(na)) { setResult('Enter a valid number'); return; }
     
-    switch (mode) {
-      case 'of':
-        if (isNaN(nb)) { setResult('Enter a valid number'); return; }
-        setResult(`${na}% of ${nb} = ${(na / 100 * nb).toFixed(4).replace(/\.?0+$/, '')}`);
-        break;
-      case 'increase':
-        if (isNaN(nb)) { setResult('Enter a valid number'); return; }
-        const inc = ((nb - na) / na * 100);
-        setResult(`${na} → ${nb}\nIncrease = ${inc.toFixed(2)}%`);
-        break;
-      case 'decrease':
-        if (isNaN(nb)) { setResult('Enter a valid number'); return; }
-        const dec = ((na - nb) / na * 100);
-        setResult(`${na} → ${nb}\nDecrease = ${dec.toFixed(2)}%`);
-        break;
-      case 'difference':
-        if (isNaN(nb)) { setResult('Enter a valid number'); return; }
-        const diff = (Math.abs(na - nb) / ((na + nb) / 2)) * 100;
-        setResult(`Percentage difference between ${na} and ${nb} = ${diff.toFixed(2)}%`);
-        break;
-      case 'discount':
-        if (isNaN(nb)) { setResult('Enter a valid number'); return; }
-        const saved = na / 100 * nb;
-        const final2 = nb - saved;
-        setResult(`Original: ${nb}\nDiscount: ${na}%\nYou save: ${saved.toFixed(2)}\nFinal price: ${final2.toFixed(2)}`);
-        break;
-      case 'tax':
-        if (isNaN(nb)) { setResult('Enter a valid number'); return; }
-        const tax = na / 100 * nb;
-        const total = nb + tax;
-        setResult(`Subtotal: ${nb}\nTax (${na}%): ${tax.toFixed(2)}\nTotal: ${total.toFixed(2)}`);
-        break;
-      case 'score':
-        if (isNaN(nb) || nb === 0) { setResult('Enter valid numbers'); return; }
-        const pct = (na / nb) * 100;
-        setResult(`${na} out of ${nb} = ${pct.toFixed(2)}%`);
-        break;
+    try {
+      switch (mode) {
+        case 'of':
+          if (isNaN(nb)) { setResult('Enter a valid number'); return; }
+          setResult(`${na}% of ${nb} = ${(na / 100 * nb).toFixed(4).replace(/\.?0+$/, '')}`);
+          break;
+        case 'increase':
+          if (isNaN(nb)) { setResult('Enter a valid number'); return; }
+          if (na === 0) { setResult('Original value cannot be zero'); return; }
+          const inc = ((nb - na) / na * 100);
+          if (!isFinite(inc)) { setResult('Result is undefined'); return; }
+          setResult(`${na} → ${nb}\nIncrease = ${inc.toFixed(2)}%`);
+          break;
+        case 'decrease':
+          if (isNaN(nb)) { setResult('Enter a valid number'); return; }
+          if (na === 0) { setResult('Original value cannot be zero'); return; }
+          const dec = ((na - nb) / na * 100);
+          if (!isFinite(dec)) { setResult('Result is undefined'); return; }
+          setResult(`${na} → ${nb}\nDecrease = ${dec.toFixed(2)}%`);
+          break;
+        case 'difference':
+          if (isNaN(nb)) { setResult('Enter a valid number'); return; }
+          if (na + nb === 0) { setResult('Cannot calculate difference when both values sum to zero'); return; }
+          const diff = (Math.abs(na - nb) / ((na + nb) / 2)) * 100;
+          if (!isFinite(diff)) { setResult('Result is undefined'); return; }
+          setResult(`Percentage difference between ${na} and ${nb} = ${diff.toFixed(2)}%`);
+          break;
+        case 'discount':
+          if (isNaN(nb)) { setResult('Enter a valid number'); return; }
+          const saved = na / 100 * nb;
+          const final2 = nb - saved;
+          setResult(`Original: ${nb}\nDiscount: ${na}%\nYou save: ${saved.toFixed(2)}\nFinal price: ${final2.toFixed(2)}`);
+          break;
+        case 'tax':
+          if (isNaN(nb)) { setResult('Enter a valid number'); return; }
+          const tax = na / 100 * nb;
+          const total = nb + tax;
+          setResult(`Subtotal: ${nb}\nTax (${na}%): ${tax.toFixed(2)}\nTotal: ${total.toFixed(2)}`);
+          break;
+        case 'score':
+          if (isNaN(nb) || nb === 0) { setResult('Total cannot be zero'); return; }
+          const pct = (na / nb) * 100;
+          if (!isFinite(pct)) { setResult('Result is undefined'); return; }
+          setResult(`${na} out of ${nb} = ${pct.toFixed(2)}%`);
+          break;
+      }
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : 'Calculation failed'}`);
     }
   };
 

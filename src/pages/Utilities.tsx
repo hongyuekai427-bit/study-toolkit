@@ -140,30 +140,37 @@ export function ChartsPage() {
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-center font-semibold mb-4">{title}</h3>
-        {chartType === 'bar' && (
+        {chartType === 'bar' && valueArr.length > 0 && (
           <div className="flex items-end justify-center gap-3 h-48">
             {valueArr.map((v, i) => (
               <div key={i} className="flex flex-col items-center gap-1">
                 <span className="text-xs text-gray-500">{v}</span>
-                <div className="w-10 rounded-t" style={{ height: `${(v / maxVal) * 160}px`, backgroundColor: colors[i % colors.length] }} />
+                <div className="w-10 rounded-t" style={{ height: `${maxVal > 0 ? (v / maxVal) * 160 : 0}px`, backgroundColor: colors[i % colors.length] }} />
                 <span className="text-xs text-gray-500">{labelArr[i] || ''}</span>
               </div>
             ))}
           </div>
         )}
-        {chartType === 'line' && (
+        {chartType === 'line' && valueArr.length > 0 && (
           <svg viewBox="0 0 400 200" className="w-full h-48">
-            <polyline fill="none" stroke="#6366f1" strokeWidth="2" points={valueArr.map((v, i) => `${(i / (valueArr.length - 1)) * 380 + 10},${180 - (v / maxVal) * 160}`).join(' ')} />
-            {valueArr.map((v, i) => <circle key={i} cx={(i / (valueArr.length - 1)) * 380 + 10} cy={180 - (v / maxVal) * 160} r="4" fill="#6366f1" />)}
+            {valueArr.length > 1 && (
+              <polyline fill="none" stroke="#6366f1" strokeWidth="2" points={valueArr.map((v, i) => `${(i / (valueArr.length - 1)) * 380 + 10},${180 - (v / maxVal) * 160}`).join(' ')} />
+            )}
+            {valueArr.map((v, i) => {
+              const cx = valueArr.length > 1 ? (i / (valueArr.length - 1)) * 380 + 10 : 200;
+              const cy = 180 - (v / maxVal) * 160;
+              return <circle key={i} cx={cx} cy={cy} r="4" fill="#6366f1" />;
+            })}
           </svg>
         )}
-        {chartType === 'pie' && (
+        {chartType === 'pie' && total > 0 && (
           <div className="flex items-center justify-center">
             <svg viewBox="0 0 200 200" className="w-48 h-48">
               {(() => {
                 let startAngle = 0;
                 return valueArr.map((v, i) => {
                   const angle = (v / total) * 360;
+                  if (angle === 0) return null;
                   const endAngle = startAngle + angle;
                   const startRad = (startAngle - 90) * Math.PI / 180;
                   const endRad = (endAngle - 90) * Math.PI / 180;

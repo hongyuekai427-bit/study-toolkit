@@ -12,64 +12,81 @@ export default function DateToolsPage() {
   const [excludeWeekends, setExcludeWeekends] = useState(false);
 
   const calculate = () => {
-    switch (mode) {
-      case 'difference': {
-        if (!date1 || !date2) { setResult('Enter both dates'); return; }
-        const d1 = new Date(date1);
-        const d2 = new Date(date2);
-        const diffMs = Math.abs(d2.getTime() - d1.getTime());
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        const diffWeeks = Math.floor(diffDays / 7);
-        const remainingDays = diffDays % 7;
-        setResult(`${diffDays} days (${diffWeeks} weeks${remainingDays > 0 ? ` and ${remainingDays} days` : ''})`);
-        break;
-      }
-      case 'countdown': {
-        if (!date1) { setResult('Enter a target date'); return; }
-        const target = new Date(date1);
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        target.setHours(0, 0, 0, 0);
-        const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        if (diff < 0) setResult(`That date was ${Math.abs(diff)} days ago`);
-        else if (diff === 0) setResult('That date is today!');
-        else if (diff === 1) setResult('Tomorrow!');
-        else setResult(`${diff} days remaining`);
-        break;
-      }
-      case 'addDays': {
-        if (!date1 || !daysToAdd) { setResult('Enter a date and number of days'); return; }
-        const d = new Date(date1);
-        d.setDate(d.getDate() + parseInt(daysToAdd));
-        setResult(d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
-        break;
-      }
-      case 'schoolDays': {
-        if (!date1 || !date2) { setResult('Enter both dates'); return; }
-        const d1 = new Date(date1);
-        const d2 = new Date(date2);
-        let count = 0;
-        const current = new Date(d1);
-        while (current <= d2) {
-          const day = current.getDay();
-          if (day !== 0 && day !== 6) count++;
-          current.setDate(current.getDate() + 1);
+    try {
+      switch (mode) {
+        case 'difference': {
+          if (!date1 || !date2) { setResult('Enter both dates'); return; }
+          const d1 = new Date(date1);
+          const d2 = new Date(date2);
+          if (isNaN(d1.getTime()) || isNaN(d2.getTime())) { setResult('Invalid date format'); return; }
+          const diffMs = Math.abs(d2.getTime() - d1.getTime());
+          const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          const diffWeeks = Math.floor(diffDays / 7);
+          const remainingDays = diffDays % 7;
+          setResult(`${diffDays} days (${diffWeeks} weeks${remainingDays > 0 ? ` and ${remainingDays} days` : ''})`);
+          break;
         }
-        setResult(`${count} school days (excluding weekends)`);
-        break;
+        case 'countdown': {
+          if (!date1) { setResult('Enter a target date'); return; }
+          const target = new Date(date1);
+          if (isNaN(target.getTime())) { setResult('Invalid date format'); return; }
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          target.setHours(0, 0, 0, 0);
+          const diff = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          if (diff < 0) setResult(`That date was ${Math.abs(diff)} days ago`);
+          else if (diff === 0) setResult('That date is today!');
+          else if (diff === 1) setResult('Tomorrow!');
+          else setResult(`${diff} days remaining`);
+          break;
+        }
+        case 'addDays': {
+          if (!date1 || !daysToAdd) { setResult('Enter a date and number of days'); return; }
+          const d = new Date(date1);
+          if (isNaN(d.getTime())) { setResult('Invalid date format'); return; }
+          const daysNum = parseInt(daysToAdd);
+          if (isNaN(daysNum)) { setResult('Enter a valid number of days'); return; }
+          d.setDate(d.getDate() + daysNum);
+          if (isNaN(d.getTime())) { setResult('Result date is invalid'); return; }
+          setResult(d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+          break;
+        }
+        case 'schoolDays': {
+          if (!date1 || !date2) { setResult('Enter both dates'); return; }
+          const d1 = new Date(date1);
+          const d2 = new Date(date2);
+          if (isNaN(d1.getTime()) || isNaN(d2.getTime())) { setResult('Invalid date format'); return; }
+          if (d1 > d2) { setResult('Start date must be before end date'); return; }
+          let count = 0;
+          const current = new Date(d1);
+          const maxIterations = 365 * 10; // Safety limit
+          let iterations = 0;
+          while (current <= d2 && iterations < maxIterations) {
+            const day = current.getDay();
+            if (day !== 0 && day !== 6) count++;
+            current.setDate(current.getDate() + 1);
+            iterations++;
+          }
+          setResult(`${count} school days (excluding weekends)`);
+          break;
+        }
+        case 'age': {
+          if (!date1) { setResult('Enter a birth date'); return; }
+          const birth = new Date(date1);
+          if (isNaN(birth.getTime())) { setResult('Invalid date format'); return; }
+          const now = new Date();
+          if (birth > now) { setResult('Birth date cannot be in the future'); return; }
+          let years = now.getFullYear() - birth.getFullYear();
+          let months = now.getMonth() - birth.getMonth();
+          let days = now.getDate() - birth.getDate();
+          if (days < 0) { months--; days += 30; }
+          if (months < 0) { years--; months += 12; }
+          setResult(`${years} years, ${months} months, ${days} days`);
+          break;
+        }
       }
-      case 'age': {
-        if (!date1) { setResult('Enter a birth date'); return; }
-        const birth = new Date(date1);
-        const now = new Date();
-        let years = now.getFullYear() - birth.getFullYear();
-        let months = now.getMonth() - birth.getMonth();
-        let days = now.getDate() - birth.getDate();
-        if (days < 0) { months--; days += 30; }
-        if (months < 0) { years--; months += 12; }
-        setResult(`${years} years, ${months} months, ${days} days`);
-        break;
-      }
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : 'Calculation failed'}`);
     }
   };
 

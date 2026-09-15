@@ -104,21 +104,33 @@ export default function NotesPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Simple markdown rendering
+  // Simple HTML sanitizer - escape dangerous characters
+  const escapeHtml = (str: string) => {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  // Simple markdown rendering (sanitized)
   const renderMarkdown = (text: string) => {
-    return text
+    // First escape HTML to prevent XSS
+    const escaped = escapeHtml(text);
+    return escaped
       .replace(/^### (.+)$/gm, '<h3 class="text-lg font-bold mt-4 mb-2">$1</h3>')
       .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold mt-4 mb-2">$1</h2>')
       .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-4 mb-2">$1</h1>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/`(.+?)`/g, '<code class="bg-gray-100 dark:bg-gray-700 px-1 rounded text-sm">$1</code>')
+      .replace(/^- \[x\] (.+)$/gm, '<li class="ml-4 line-through text-gray-500">☑ $1</li>')
+      .replace(/^- \[ \] (.+)$/gm, '<li class="ml-4">☐ $1</li>')
       .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
       .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal">$1</li>')
-      .replace(/^- \[ \] (.+)$/gm, '<li class="ml-4">☐ $1</li>')
-      .replace(/^- \[x\] (.+)$/gm, '<li class="ml-4 line-through text-gray-500">☑ $1</li>')
-      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-indigo-500 underline" target="_blank" rel="noopener">$1</a>')
-      .replace(/\n\n/g, '<br/><br/>')
+      .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-indigo-500 underline" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/\n\n/g, '</p><p>')
       .replace(/\n/g, '<br/>');
   };
 

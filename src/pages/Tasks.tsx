@@ -88,7 +88,9 @@ export default function TasksPage() {
   const getDaysUntil = (dateStr: string) => {
     if (!dateStr) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
+    const target = new Date(dateStr);
+    if (isNaN(target.getTime())) return null;
+    target.setHours(0, 0, 0, 0);
     return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
 
@@ -173,7 +175,7 @@ export default function TasksPage() {
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       {task.subject && <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">{task.subject}</span>}
                       <span className={`text-xs px-2 py-0.5 rounded ${task.priority === 'high' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : task.priority === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'}`}>{task.priority}</span>
-                      {days !== null && !task.completed && (
+                      {days !== null && !isNaN(days) && !task.completed && (
                         <span className={`text-xs ${days <= 0 ? 'text-red-500 font-medium' : days <= 2 ? 'text-orange-500' : 'text-gray-500'}`}>
                           {days <= 0 ? 'Overdue' : days === 1 ? 'Tomorrow' : `${days} days left`}
                         </span>

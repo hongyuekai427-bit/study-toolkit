@@ -12,13 +12,16 @@ export default function TimerPage() {
   const [sessionsBeforeLong, setSessionsBeforeLong] = useLocalStorage('pomodoroSessions', 4);
   const [customMinutes, setCustomMinutes] = useState(30);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [initialTime, setInitialTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [sessions, setSessions] = useState(0);
   const [totalFocusToday, setTotalFocusToday] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [label, setLabel] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number>(0);
+  const modeRef = useRef(mode);
+
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -28,25 +31,19 @@ export default function TimerPage() {
     setSessions(parseInt(localStorage.getItem(sessKey) || '0'));
   }, []);
 
-  useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            handleComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+  const getDuration = useCallback(() => {
+    switch (modeRef.current) {
+      case 'focus': return focusDuration * 60;
+      case 'short-break': return shortBreakDuration * 60;
+      case 'long-break': return longBreakDuration * 60;
+      case 'custom': return customMinutes * 60;
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning]);
+  }, [focusDuration, shortBreakDuration, longBreakDuration, customMinutes]);
 
   const handleComplete = useCallback(() => {
-    if (mode === 'focus' || mode === 'custom') {
-      const durationMin = Math.round((getDuration() - timeLeft) / 60);
+    const currentMode = modeRef.current;
+    if (currentMode === 'focus' || currentMode === 'custom') {
+      const durationMin = Math.round(initialTime / 60);
       const today = new Date().toISOString().split('T')[0];
       const key = `studyscope_focus_${today}`;
       const current = parseInt(localStorage.getItem(key) || '0');
@@ -65,41 +62,49 @@ export default function TimerPage() {
         stats.sessionsCompleted = (stats.sessionsCompleted || 0) + 1;
         localStorage.setItem('studyscope_stats', JSON.stringify(stats));
       } catch { /* ignore */ }
-
-      // Play notification sound
-      try {
-        const ctx = new AudioContext();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 800;
-        gain.gain.value = 0.3;
-        osc.start();
-        setTimeout(() => { osc.stop(); ctx.close(); }, 300);
-      } catch { /* ignore */ }
     }
-  }, [mode, timeLeft]);
 
-  const getDuration = () => {
-    switch (mode) {
-      case 'focus': return focusDuration * 60;
-      case 'short-break': return shortBreakDuration * 60;
-      case 'long-break': return longBreakDuration * 60;
-      case 'custom': return customMinutes * 60;
+    // Play notification sound
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      gain.gain.value = 0.3;
+      osc.start();
+      setTimeout(() => { osc.stop(); ctx.close(); }, 300);
+    } catch { /* ignore */ }
+  }, [initialTime]);
+
+  useEffect(() => {
+    if (isRunning && timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            setIsRunning(false);
+            // Use setTimeout to avoid state update during render
+            setTimeout(() => handleComplete(), 0);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
-  };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [isRunning, handleComplete]);
 
   const startTimer = () => {
     const duration = getDuration();
     setTimeLeft(duration);
+    setInitialTime(duration);
     setIsRunning(true);
-    startTimeRef.current = Date.now();
   };
 
   const pauseTimer = () => setIsRunning(false);
   const resumeTimer = () => setIsRunning(true);
-  const resetTimer = () => { setIsRunning(false); setTimeLeft(0); };
+  const resetTimer = () => { setIsRunning(false); setTimeLeft(0); setInitialTime(0); if (intervalRef.current) clearInterval(intervalRef.current); };
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -107,14 +112,14 @@ export default function TimerPage() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progress = timeLeft > 0 ? ((getDuration() - timeLeft) / getDuration()) * 100 : 0;
+  const progress = initialTime > 0 ? ((initialTime - timeLeft) / initialTime) * 100 : 0;
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
+      document.documentElement.requestFullscreen().catch(() => {});
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen();
+      document.exitFullscreen().catch(() => {});
       setIsFullscreen(false);
     }
   };
@@ -143,26 +148,26 @@ export default function TimerPage() {
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-xs text-gray-500 block mb-1">Focus (min)</label>
-            <input type="number" value={focusDuration} onChange={e => setFocusDuration(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="number" min={1} max={120} value={focusDuration} onChange={e => setFocusDuration(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Short Break (min)</label>
-            <input type="number" value={shortBreakDuration} onChange={e => setShortBreakDuration(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="number" min={1} max={30} value={shortBreakDuration} onChange={e => setShortBreakDuration(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Long Break (min)</label>
-            <input type="number" value={longBreakDuration} onChange={e => setLongBreakDuration(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="number" min={1} max={60} value={longBreakDuration} onChange={e => setLongBreakDuration(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Sessions before long</label>
-            <input type="number" value={sessionsBeforeLong} onChange={e => setSessionsBeforeLong(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="number" min={1} max={10} value={sessionsBeforeLong} onChange={e => setSessionsBeforeLong(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
 
         {mode === 'custom' && (
           <div className="mb-4">
             <label className="text-xs text-gray-500 block mb-1">Custom Duration (min)</label>
-            <input type="number" value={customMinutes} onChange={e => setCustomMinutes(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="number" min={1} max={240} value={customMinutes} onChange={e => setCustomMinutes(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         )}
 

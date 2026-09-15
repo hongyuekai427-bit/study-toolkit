@@ -34,7 +34,7 @@ export default function GradesPage() {
 
   // Simple average
   const simpleAvg = () => {
-    const valid = grades.filter(g => g.score && g.maxScore);
+    const valid = grades.filter(g => g.score && g.maxScore && parseFloat(g.maxScore) !== 0);
     if (valid.length === 0) return null;
     const total = valid.reduce((sum, g) => sum + (parseFloat(g.score) / parseFloat(g.maxScore) * 100), 0);
     return (total / valid.length).toFixed(2);
@@ -42,15 +42,17 @@ export default function GradesPage() {
 
   // Weighted average
   const weightedAvg = () => {
-    const valid = grades.filter(g => g.score && g.maxScore && g.weight);
+    const valid = grades.filter(g => g.score && g.maxScore && g.weight && parseFloat(g.maxScore) !== 0);
     if (valid.length === 0) return null;
     let totalWeighted = 0;
     let totalWeight = 0;
     valid.forEach(g => {
       const pct = parseFloat(g.score) / parseFloat(g.maxScore) * 100;
       const w = parseFloat(g.weight);
-      totalWeighted += pct * w;
-      totalWeight += w;
+      if (!isNaN(pct) && !isNaN(w)) {
+        totalWeighted += pct * w;
+        totalWeight += w;
+      }
     });
     if (totalWeight === 0) return null;
     return (totalWeighted / totalWeight).toFixed(2);
@@ -58,8 +60,8 @@ export default function GradesPage() {
 
   // Target grade
   const targetGrade = () => {
-    const valid = grades.filter(g => g.score && g.maxScore && g.weight);
-    if (valid.length === 0) return null;
+    const valid = grades.filter(g => g.score && g.maxScore && g.weight && parseFloat(g.maxScore) !== 0);
+    if (valid.length < 2) return null;
     const target = parseFloat(targetOverall);
     if (isNaN(target)) return null;
     let currentWeighted = 0;
@@ -67,17 +69,21 @@ export default function GradesPage() {
     valid.forEach(g => {
       const pct = parseFloat(g.score) / parseFloat(g.maxScore) * 100;
       const w = parseFloat(g.weight);
-      currentWeighted += pct * w;
-      currentWeight += w;
+      if (!isNaN(pct) && !isNaN(w)) {
+        currentWeighted += pct * w;
+        currentWeight += w;
+      }
     });
     if (currentWeight === 0) return null;
     // Assuming the last entry is the "final" we need to calculate for
     const lastGrade = valid[valid.length - 1];
     const lastWeight = parseFloat(lastGrade.weight);
-    const otherWeighted = currentWeighted - (parseFloat(lastGrade.score) / parseFloat(lastGrade.maxScore) * 100 * lastWeight);
+    if (lastWeight === 0) return null;
+    const lastPct = parseFloat(lastGrade.score) / parseFloat(lastGrade.maxScore) * 100;
+    const otherWeighted = currentWeighted - (lastPct * lastWeight);
     const otherWeight = currentWeight - lastWeight;
-    if (otherWeight === 0) return null;
     const needed = (target * currentWeight - otherWeighted) / lastWeight;
+    if (!isFinite(needed)) return null;
     return needed.toFixed(2);
   };
 
@@ -88,11 +94,17 @@ export default function GradesPage() {
     let totalPoints = 0;
     let totalCredits = 0;
     valid.forEach(g => {
-      totalPoints += parseFloat(g.gradePoint) * parseFloat(g.credits);
-      totalCredits += parseFloat(g.credits);
+      const gp = parseFloat(g.gradePoint);
+      const cr = parseFloat(g.credits);
+      if (!isNaN(gp) && !isNaN(cr)) {
+        totalPoints += gp * cr;
+        totalCredits += cr;
+      }
     });
     if (totalCredits === 0) return null;
-    return (totalPoints / totalCredits).toFixed(3);
+    const gpa = totalPoints / totalCredits;
+    if (!isFinite(gpa)) return null;
+    return gpa.toFixed(3);
   };
 
   const modes: { id: CalcMode; label: string }[] = [

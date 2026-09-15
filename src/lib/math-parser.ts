@@ -1,7 +1,10 @@
 // Safe mathematical expression parser - no eval()
 // Supports: +, -, *, /, ^, %, parentheses, functions, constants
+// Supports implicit multiplication: 2x, 2(x+1), x(x+1)
 
 type Token = { type: 'number' | 'operator' | 'function' | 'lparen' | 'rparen' | 'comma' | 'constant'; value: string };
+
+const KNOWN_FUNCTIONS = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'log', 'ln', 'sqrt', 'cbrt', 'abs', 'ceil', 'floor', 'round', 'factorial', 'fact', 'exp'];
 
 function tokenize(expr: string): Token[] {
   const tokens: Token[] = [];
@@ -17,26 +20,42 @@ function tokenize(expr: string): Token[] {
       }
       tokens.push({ type: 'number', value: num });
     }
-    // Constants
-    else if (s.substring(i, i + 2) === 'pi' || s[i] === 'π') {
-      tokens.push({ type: 'constant', value: 'pi' });
-      i += s[i] === 'π' ? 1 : 2;
-    }
-    else if (s.substring(i, i + 1) === 'e' && (i + 1 >= s.length || !/[a-z]/i.test(s[i + 1]))) {
-      tokens.push({ type: 'constant', value: 'e' });
-      i += 1;
-    }
-    // Functions
-    else if (/[a-zA-Z]/.test(s[i])) {
-      let fn = '';
-      while (i < s.length && /[a-zA-Z]/.test(s[i])) {
-        fn += s[i++];
+    // Constants and functions (start with letter)
+    else if (/[a-zA-Zπ]/.test(s[i])) {
+      // Check for pi symbol
+      if (s[i] === 'π') {
+        tokens.push({ type: 'constant', value: 'pi' });
+        i++;
+        continue;
       }
-      const knownFns = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'log', 'ln', 'sqrt', 'cbrt', 'abs', 'ceil', 'floor', 'round', 'factorial', 'fact'];
-      if (knownFns.includes(fn.toLowerCase())) {
-        tokens.push({ type: 'function', value: fn.toLowerCase() });
-      } else {
-        throw new Error(`Unknown function: ${fn}`);
+      
+      // Read the full word
+      let word = '';
+      const startIdx = i;
+      while (i < s.length && /[a-zA-Z]/.test(s[i])) {
+        word += s[i++];
+      }
+      
+      // Check if it's a known function
+      const lowerWord = word.toLowerCase();
+      if (KNOWN_FUNCTIONS.includes(lowerWord)) {
+        tokens.push({ type: 'function', value: lowerWord });
+      }
+      // Check if it's 'pi'
+      else if (lowerWord === 'pi') {
+        tokens.push({ type: 'constant', value: 'pi' });
+      }
+      // Check if it's 'e' (Euler's number) - only if it's exactly 'e' and not part of a larger word
+      else if (lowerWord === 'e') {
+        tokens.push({ type: 'constant', value: 'e' });
+      }
+      // Check if it's 'x' (variable) - treat as a special constant that should have been substituted
+      else if (lowerWord === 'x') {
+        // This shouldn't happen if x was substituted, but handle gracefully
+        throw new Error(`Unknown variable: x. Make sure to substitute x with a number.`);
+      }
+      else {
+        throw new Error(`Unknown identifier: ${word}`);
       }
     }
     // Operators
@@ -59,7 +78,31 @@ function tokenize(expr: string): Token[] {
       throw new Error(`Unexpected character: ${s[i]}`);
     }
   }
-  return tokens;
+  
+  // Insert implicit multiplication tokens
+  // e.g., 2x -> 2*x, 2( -> 2*(, )( -> )*(, x( -> x*(
+  const result: Token[] = [];
+  for (let j = 0; j < tokens.length; j++) {
+    result.push(tokens[j]);
+    if (j < tokens.length - 1) {
+      const curr = tokens[j];
+      const next = tokens[j + 1];
+      // Insert * if:
+      // - number followed by (, function, or constant
+      // - ) followed by (, number, function, or constant
+      // - constant followed by (, function, or constant
+      const needsMultiply = 
+        (curr.type === 'number' && (next.type === 'lparen' || next.type === 'function' || next.type === 'constant')) ||
+        (curr.type === 'rparen' && (next.type === 'lparen' || next.type === 'number' || next.type === 'function' || next.type === 'constant')) ||
+        (curr.type === 'constant' && (next.type === 'lparen' || next.type === 'function' || next.type === 'constant' || next.type === 'number'));
+      
+      if (needsMultiply) {
+        result.push({ type: 'operator', value: '*' });
+      }
+    }
+  }
+  
+  return result;
 }
 
 class Parser {
@@ -188,18 +231,31 @@ class Parser {
     switch (name) {
       case 'sin': return Math.sin(toRad(arg));
       case 'cos': return Math.cos(toRad(arg));
-      case 'tan': return Math.tan(toRad(arg));
-      case 'asin': return fromRad(Math.asin(arg));
-      case 'acos': return fromRad(Math.acos(arg));
+      case 'tan': 
+        const tanVal = Math.tan(toRad(arg));
+        return tanVal;
+      case 'asin': 
+        if (arg < -1 || arg > 1) throw new Error('asin domain error: argument must be between -1 and 1');
+        return fromRad(Math.asin(arg));
+      case 'acos': 
+        if (arg < -1 || arg > 1) throw new Error('acos domain error: argument must be between -1 and 1');
+        return fromRad(Math.acos(arg));
       case 'atan': return fromRad(Math.atan(arg));
-      case 'log': return Math.log10(arg);
-      case 'ln': return Math.log(arg);
-      case 'sqrt': return Math.sqrt(arg);
+      case 'log': 
+        if (arg <= 0) throw new Error('log domain error: argument must be positive');
+        return Math.log10(arg);
+      case 'ln': 
+        if (arg <= 0) throw new Error('ln domain error: argument must be positive');
+        return Math.log(arg);
+      case 'sqrt': 
+        if (arg < 0) throw new Error('sqrt domain error: argument must be non-negative');
+        return Math.sqrt(arg);
       case 'cbrt': return Math.cbrt(arg);
       case 'abs': return Math.abs(arg);
       case 'ceil': return Math.ceil(arg);
       case 'floor': return Math.floor(arg);
       case 'round': return Math.round(arg);
+      case 'exp': return Math.exp(arg);
       case 'factorial':
       case 'fact':
         if (arg < 0 || !Number.isInteger(arg)) throw new Error('Factorial requires non-negative integer');
@@ -216,11 +272,17 @@ class Parser {
 export function evaluate(expr: string, useDegrees: boolean = true): number {
   if (!expr.trim()) throw new Error('Empty expression');
   const tokens = tokenize(expr);
+  if (tokens.length === 0) throw new Error('Empty expression');
   const parser = new Parser(tokens, useDegrees);
   return parser.parse();
 }
 
 export function formatResult(num: number): string {
+  if (!isFinite(num)) {
+    if (num === Infinity) return '∞';
+    if (num === -Infinity) return '-∞';
+    return 'undefined';
+  }
   if (Number.isInteger(num)) return num.toString();
   if (Math.abs(num) > 1e10 || (Math.abs(num) < 1e-10 && num !== 0)) {
     return num.toExponential(6);
@@ -230,8 +292,8 @@ export function formatResult(num: number): string {
 
 // Fraction utilities
 export function gcd(a: number, b: number): number {
-  a = Math.abs(a);
-  b = Math.abs(b);
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
   while (b) {
     [a, b] = [b, a % b];
   }
@@ -239,7 +301,8 @@ export function gcd(a: number, b: number): number {
 }
 
 export function lcm(a: number, b: number): number {
-  return Math.abs(a * b) / gcd(a, b);
+  if (a === 0 || b === 0) return 0;
+  return Math.abs(Math.round(a) * Math.round(b)) / gcd(a, b);
 }
 
 export interface Fraction {
@@ -248,9 +311,11 @@ export interface Fraction {
 }
 
 export function simplifyFraction(f: Fraction): Fraction {
+  if (f.denominator === 0) throw new Error('Denominator cannot be zero');
   const g = gcd(f.numerator, f.denominator);
-  const num = f.numerator / g;
-  const den = f.denominator / g;
+  if (g === 0) return { numerator: 0, denominator: 1 };
+  const num = Math.round(f.numerator / g);
+  const den = Math.round(f.denominator / g);
   if (den < 0) return { numerator: -num, denominator: -den };
   return { numerator: num, denominator: den };
 }
@@ -274,17 +339,21 @@ export function fractionToMixed(f: Fraction): string {
 
 export function fractionToDecimal(f: Fraction): string {
   const s = simplifyFraction(f);
-  return (s.numerator / s.denominator).toString();
+  const result = s.numerator / s.denominator;
+  if (!isFinite(result)) return 'undefined';
+  return parseFloat(result.toPrecision(10)).toString();
 }
 
 export function addFractions(a: Fraction, b: Fraction): Fraction {
   const den = lcm(a.denominator, b.denominator);
+  if (den === 0) throw new Error('Cannot add fractions with zero denominator');
   const num = a.numerator * (den / a.denominator) + b.numerator * (den / b.denominator);
   return simplifyFraction({ numerator: num, denominator: den });
 }
 
 export function subtractFractions(a: Fraction, b: Fraction): Fraction {
   const den = lcm(a.denominator, b.denominator);
+  if (den === 0) throw new Error('Cannot subtract fractions with zero denominator');
   const num = a.numerator * (den / a.denominator) - b.numerator * (den / b.denominator);
   return simplifyFraction({ numerator: num, denominator: den });
 }
@@ -303,7 +372,9 @@ export function divideFractions(a: Fraction, b: Fraction): Fraction {
 
 export function parseMixedNumber(input: string): Fraction {
   const trimmed = input.trim();
-  // Mixed number: "2 3/4"
+  if (!trimmed) throw new Error('Empty input');
+  
+  // Mixed number: "2 3/4" or "-2 3/4"
   const mixedMatch = trimmed.match(/^(-?\d+)\s+(\d+)\/(\d+)$/);
   if (mixedMatch) {
     const whole = parseInt(mixedMatch[1]);
@@ -313,8 +384,8 @@ export function parseMixedNumber(input: string): Fraction {
     const sign = whole < 0 ? -1 : 1;
     return { numerator: sign * (Math.abs(whole) * den + num), denominator: den };
   }
-  // Simple fraction: "3/4"
-  const fracMatch = trimmed.match(/^(-?\d+)\/(\d+)$/);
+  // Simple fraction: "3/4" or "-3/4"
+  const fracMatch = trimmed.match(/^(-?\d+)\/(-?\d+)$/);
   if (fracMatch) {
     const num = parseInt(fracMatch[1]);
     const den = parseInt(fracMatch[2]);
